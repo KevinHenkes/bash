@@ -1,0 +1,9 @@
+#!/bin/sh
+
+while true
+do 
+    CPU="$(inxi -F | grep -A 2 CPU)"
+    TEMPS="$(inxi -F | grep Sensors)"
+    clear && echo "$CPU" && echo "$TEMPS"
+done
+

@@ -1,0 +1,6 @@
+value=$1
+value=`echo "$value * 1000000" | bc`
+sudo cpufreq-set -c 1 -g powersave -u `echo "$value"`
+sudo cpufreq-set -c 2 -g powersave -u `echo "$value"`
+sudo cpufreq-set -c 0 -g powersave -u `echo "$value"`
+sudo cpufreq-set -c 3 -g powersave -u `echo "$value"`

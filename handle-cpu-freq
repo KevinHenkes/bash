@@ -1,0 +1,126 @@
+#!/bin/bash
+#Require inxi awk grep bc cpufrequtils cat echo
+#Set max temp limit with -7 for ecart-type max, replace min cpu freq with nominal and max cpu freq from constructor sheet
+TEMPS_FILE="/tmp/temp-file"
+FREQ_FILE="/tmp/freq-file"
+STRESS_CPU_TEST_FILE="/tmp/stress-cpu-file"
+MAX_TEMP=67
+MIN_CPU_FREQ=1.8
+MAX_CPU_FREQ=2.9
+ACTUAL_CPU_FREQ_SET=$MAX_CPU_FREQ
+WAIT=1
+FREQ_DIFF=0.1
+CORE=4
+STEP=1
+HOT=0
+
+value=`echo "$MIN_CPU_FREQ * 1000000" | bc`
+    
+sudo cpufreq-set -c 1 -g powersave -u `echo "$value"`
+sudo cpufreq-set -c 2 -g powersave -u `echo "$value"`
+sudo cpufreq-set -c 0 -g powersave -u `echo "$value"`
+sudo cpufreq-set -c 3 -g powersave -u `echo "$value"`
+
+#sleep 75
+
+echo "while true;do a=1;done" > $STRESS_CPU_TEST_FILE
+chmod +x $STRESS_CPU_TEST_FILE
+
+$STRESS_CPU_TEST_FILE&
+
+CPU_STRESS_PID="$(echo $!)"
+
+while true
+do
+    TEMPS="$(inxi -F | grep Sensors)"
+    TEMPS="$(echo "$TEMPS" | grep -o -P "[0-9]*\.{1}[0-9]*")"
+    CPU="$(inxi -F | grep -A 1 "clock speeds")"
+    CPU="$(echo "$CPU" | grep -o -P "\d* MHz")"
+    CPU="$(echo "$CPU" | grep -o -P "\d*")"
+    
+    echo "$CPU" > $FREQ_FILE
+    echo "$TEMPS" > $TEMPS_FILE
+    
+    FREQ1="$(cat $FREQ_FILE | awk 'NR>2{exit}NR>=2')"
+    FREQ2="$(cat $FREQ_FILE | awk 'NR>3{exit}NR>=3')"
+    FREQ3="$(cat $FREQ_FILE | awk 'NR>4{exit}NR>=4')"
+    FREQ4="$(cat $FREQ_FILE | awk 'NR>5{exit}NR>=5')"
+    
+    ACTUAL_CPU_FREQ="$(echo "($FREQ1 + $FREQ2 + $FREQ3 + $FREQ4) / 4" | bc)"
+    CPU_TEMP="$(head -n 1 $TEMPS_FILE)"
+    TEMP_LEN=${#CPU_TEMP}
+    ACTUAL_TEMP=${CPU_TEMP:0:(TEMP_LEN-2)}   
+    READABLE_ACTUAL_CPU_FREQ_SET=$(echo "$ACTUAL_CPU_FREQ_SET * 1000" | bc -l)
+    
+    if [ $ACTUAL_TEMP -gt  $MAX_TEMP ]
+    then
+        if [[ $STEP -eq 1 && $HOT -eq 1 ]]
+        then
+            ACTUAL_CPU_FREQ_SET="$(echo "$ACTUAL_CPU_FREQ_SET - $FREQ_DIFF" | bc)"
+        elif [ $STEP -eq 1 ]
+        then
+            HOT=1
+            ACTUAL_CPU_FREQ_SET="$(echo "$MIN_CPU_FREQ")"
+        fi
+        
+        if [ $STEP -eq 2 ]
+        then
+            STEP=3
+            WAIT=3
+            MAX_CPU_FREQ=$(echo "$ACTUAL_CPU_FREQ_SET * 1000" | bc -l)
+            kill $CPU_STRESS_PID
+        fi
+        
+        if [ $STEP -eq 3 ] && [ $(echo "$ACTUAL_CPU_FREQ > $MIN_CPU_FREQ" | bc -l) -eq 1 ]
+        then
+            if [ $(echo "$READABLE_ACTUAL_CPU_FREQ_SET > $MIN_CPU_FREQ" | bc -l) -eq 1 ]
+            then
+                ACTUAL_CPU_FREQ_SET="$(echo "$ACTUAL_CPU_FREQ_SET - $FREQ_DIFF" | bc)"
+            fi
+        fi
+    elif [ $ACTUAL_TEMP -lt $MAX_TEMP ]
+    then
+        if [ $HOT -eq 1 ]
+        then
+            MIN_CPU_FREQ=$(echo "$ACTUAL_CPU_FREQ_SET * 1000 - 1" | bc -l)
+            STEP=2
+            HOT=0
+        fi
+        
+        if [ $STEP -eq 2 ]
+        then
+            if [ $(echo "$ACTUAL_CPU_FREQ_SET < $MAX_CPU_FREQ" | bc -l) -eq 1 ]
+            then
+                ACTUAL_CPU_FREQ_SET="$(echo "$ACTUAL_CPU_FREQ_SET + $FREQ_DIFF" | bc)"
+            else
+                MAX_CPU_FREQ=$(echo "$MAX_CPU_FREQ * 1000" | bc -l)
+                STEP=3
+            fi
+        fi
+        
+        if [ $STEP -eq 3 ] && [ $(echo "$ACTUAL_CPU_FREQ >= $MIN_CPU_FREQ" | bc -l) -eq 1 ]
+        then
+            
+            if [ $(echo "$READABLE_ACTUAL_CPU_FREQ_SET < $MAX_CPU_FREQ" | bc -l) -eq 1 ]
+            then
+                ACTUAL_CPU_FREQ_SET="$(echo "$ACTUAL_CPU_FREQ_SET + $FREQ_DIFF" | bc)"
+            fi
+        fi 
+    fi
+        
+    value=`echo "$ACTUAL_CPU_FREQ_SET * 1000000" | bc`
+    
+    sudo cpufreq-set -c 1 -g powersave -u `echo "$value"`
+    sudo cpufreq-set -c 2 -g powersave -u `echo "$value"`
+    sudo cpufreq-set -c 0 -g powersave -u `echo "$value"`
+    sudo cpufreq-set -c 3 -g powersave -u `echo "$value"`
+    
+    echo "MIN CPU FREQ : $MIN_CPU_FREQ"
+    echo "MAX CPU FREQ : $MAX_CPU_FREQ"
+    echo "ACTUAL : $ACTUAL_CPU_FREQ"
+    echo "TEMP : $ACTUAL_TEMP"
+    echo "CPU_FREQ_MAX : $ACTUAL_CPU_FREQ_SET"
+    echo "STEP : $STEP"
+    echo "HOT : $HOT"
+    sleep $WAIT
+done

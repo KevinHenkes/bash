@@ -1,0 +1,3 @@
+#!/bin/bash
+/etc/init.d/handle-cpu-freq&
+echo $! > /tmp/pid-handler

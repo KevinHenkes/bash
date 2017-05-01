@@ -19,7 +19,7 @@ sudo cpufreq-set -c 2 -g powersave -u `echo "$value"`
 sudo cpufreq-set -c 0 -g powersave -u `echo "$value"`
 sudo cpufreq-set -c 3 -g powersave -u `echo "$value"`
 
-#sleep 75
+sleep 60
 
 sudo echo "while true;do a=1;done" > $STRESS_CPU_TEST_FILE
 chmod +x $STRESS_CPU_TEST_FILE

@@ -1,7 +1,6 @@
 #!/bin/bash
 #Require inxi awk grep bc cpufrequtils cat echo
 #Set max temp limit with -7 for ecart-type max, replace min cpu freq with nominal and max cpu freq from constructor sheet
-STRESS_CPU_TEST_FILE="/tmp/stress-cpu-file"
 MAX_TEMP=67
 MIN_CPU_FREQ=1.8
 MAX_CPU_FREQ=2.9
@@ -21,12 +20,10 @@ sudo cpufreq-set -c 3 -g powersave -u `echo "$value"`
 
 #sleep 60
 
-sudo echo "while true;do a=1;done" > $STRESS_CPU_TEST_FILE
-chmod +x $STRESS_CPU_TEST_FILE
-
-$STRESS_CPU_TEST_FILE&
-
+while true; do a=1; done&
 CPU_STRESS_PID="$(echo $!)"
+
+chmod +x $STRESS_CPU_TEST_FILE
 
 while true
 do

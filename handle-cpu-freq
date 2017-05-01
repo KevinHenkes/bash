@@ -1,7 +1,7 @@
 #!/bin/bash
 #Require inxi awk grep bc cpufrequtils cat echo
 #Set max temp limit with -7 for ecart-type max, replace min cpu freq with nominal and max cpu freq from constructor sheet
-MAX_TEMP=67
+MAX_TEMP=63
 MIN_CPU_FREQ=1.8
 MAX_CPU_FREQ=2.9
 ACTUAL_CPU_FREQ_SET=$MAX_CPU_FREQ

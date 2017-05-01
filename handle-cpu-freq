@@ -13,13 +13,13 @@ STEP=1
 HOT=0
 
 value=`echo "$MIN_CPU_FREQ * 1000000" | bc`
-    
+
 sudo cpufreq-set -c 1 -g powersave -u `echo "$value"`
 sudo cpufreq-set -c 2 -g powersave -u `echo "$value"`
 sudo cpufreq-set -c 0 -g powersave -u `echo "$value"`
 sudo cpufreq-set -c 3 -g powersave -u `echo "$value"`
 
-sleep 60
+#sleep 60
 
 sudo echo "while true;do a=1;done" > $STRESS_CPU_TEST_FILE
 chmod +x $STRESS_CPU_TEST_FILE
@@ -35,9 +35,6 @@ do
     CPU="$(inxi -F | grep -A 1 "clock speeds")"
     CPU="$(echo "$CPU" | grep -o -P "\d* MHz")"
     CPU="$(echo "$CPU" | grep -o -P "\d*")"
-    
-    CPU=$(echo "$CPU")
-    TEMPS=$(echo "$TEMPS")
     
     FREQ1="$(echo "$CPU" | awk 'NR>2{exit}NR>=2')"
     FREQ2="$(echo "$CPU" | awk 'NR>3{exit}NR>=3')"

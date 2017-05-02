@@ -1,10 +1,13 @@
 #!/bin/bash
 #Require inxi awk grep bc cpufrequtils cat echo
-#Set max temp limit with -7 for ecart-type max, replace min cpu freq with nominal and max cpu freq from constructor sheet
+#Set max temp limit with 7 for ecart-type, replace min cpu freq with nominal and max cpu freq from constructor sheet
 MAX_TEMP=63
+TEMP_DELTA=$(echo "4 / 2" | bc -l)
+MAX_TEMP_ROUTINE="$(echo "$MAX_TEMP + $TEMP_DELTA" | bc -l)"
+MIN_TEMP_ROUTINE="$(echo "$MAX_TEMP - $TEMP_DELTA" | bc -l)"
 MIN_CPU_FREQ=1.8
 MAX_CPU_FREQ=2.9
-ACTUAL_CPU_FREQ_SET="$(echo "$MAX_CPU_FREQ - (($MAX_CPU_FREQ - $MIN_CPU_FREQ) * 70 / 100)" | bc -l)"
+ACTUAL_CPU_FREQ_SET="$(echo "$MAX_CPU_FREQ - (($MAX_CPU_FREQ - $MIN_CPU_FREQ) * 40 / 100)" | bc -l)"
 WAIT=1
 FREQ_DIFF=0.1
 CORE=4
@@ -18,13 +21,12 @@ sudo cpufreq-set -c 2 -g powersave -u `echo "$value"`
 sudo cpufreq-set -c 0 -g powersave -u `echo "$value"`
 sudo cpufreq-set -c 3 -g powersave -u `echo "$value"`
 
+#launch after boot start time
 sleep 60
 
 while true; do a=1; done&
 
 CPU_STRESS_PID="$(echo $!)"
-
-chmod +x $STRESS_CPU_TEST_FILE
 
 while true
 do
@@ -52,22 +54,23 @@ do
         elif [ $STEP -eq 1 ]
         then
             HOT=1
-            ACTUAL_CPU_FREQ_SET="$(echo "$MIN_CPU_FREQ")"
         fi
         
         if [ $STEP -eq 2 ]
         then
             STEP=3
-            WAIT=3
             MAX_CPU_FREQ=$(echo "$ACTUAL_CPU_FREQ_SET * 1000" | bc -l)
             kill $CPU_STRESS_PID
         fi
         
-        if [ $STEP -eq 3 ] && [ $(echo "$ACTUAL_CPU_FREQ > $MIN_CPU_FREQ" | bc -l) -eq 1 ]
+        if [ $(echo "$ACTUAL_TEMP > $MAX_TEMP_ROUTINE" | bc -l) -eq 1  ]
         then
-            if [ $(echo "$READABLE_ACTUAL_CPU_FREQ_SET > $MIN_CPU_FREQ" | bc -l) -eq 1 ]
+            if [ $STEP -eq 3 ] && [ $(echo "$ACTUAL_CPU_FREQ > $MIN_CPU_FREQ" | bc -l) -eq 1 ]
             then
-                ACTUAL_CPU_FREQ_SET="$(echo "$ACTUAL_CPU_FREQ_SET - $FREQ_DIFF" | bc)"
+                if [ $(echo "$READABLE_ACTUAL_CPU_FREQ_SET > $MIN_CPU_FREQ" | bc -l) -eq 1 ]
+                then
+                    ACTUAL_CPU_FREQ_SET="$(echo "$ACTUAL_CPU_FREQ_SET - $FREQ_DIFF" | bc)"
+                fi
             fi
         fi
     elif [ $ACTUAL_TEMP -lt $MAX_TEMP ]
@@ -90,14 +93,17 @@ do
             fi
         fi
         
-        if [ $STEP -eq 3 ] && [ $(echo "$ACTUAL_CPU_FREQ >= $MIN_CPU_FREQ" | bc -l) -eq 1 ]
+        if [ $(echo "$ACTUAL_TEMP < $MIN_TEMP_ROUTINE" | bc -l) -eq 1 ]
         then
-            
-            if [ $(echo "$READABLE_ACTUAL_CPU_FREQ_SET < $MAX_CPU_FREQ" | bc -l) -eq 1 ]
+            if [ $STEP -eq 3 ] && [ $(echo "$ACTUAL_CPU_FREQ >= $MIN_CPU_FREQ" | bc -l) -eq 1 ]
             then
-                ACTUAL_CPU_FREQ_SET="$(echo "$ACTUAL_CPU_FREQ_SET + $FREQ_DIFF" | bc)"
-            fi
-        fi 
+                if [ $(echo "$READABLE_ACTUAL_CPU_FREQ_SET < $MAX_CPU_FREQ" | bc -l) -eq 1 ]
+                then
+                    echo "$ACTUAL_CPU_FREQ_SET"
+                    ACTUAL_CPU_FREQ_SET="$(echo "$ACTUAL_CPU_FREQ_SET + $FREQ_DIFF" | bc)"
+                fi
+            fi 
+        fi
     fi
         
     value=`echo "$ACTUAL_CPU_FREQ_SET * 1000000" | bc`
@@ -109,10 +115,13 @@ do
     
     #echo "MIN CPU FREQ : $MIN_CPU_FREQ"
     #echo "MAX CPU FREQ : $MAX_CPU_FREQ"
-    #echo "ACTUAL : $ACTUAL_CPU_FREQ"
+    #echo "ACTUAL FREQ : $ACTUAL_CPU_FREQ"
     #echo "TEMP : $ACTUAL_TEMP"
-    #echo "CPU_FREQ_MAX : $ACTUAL_CPU_FREQ_SET"
+    #echo "MIN TEMP ROUTINE : $MIN_TEMP_ROUTINE"
+    #echo "CPU_FREQ: $ACTUAL_CPU_FREQ_SET"
+    #echo "ACTUAL READABLE CPU FREQ: $READABLE_ACTUAL_CPU_FREQ_SET"
     #echo "STEP : $STEP"
     #echo "HOT : $HOT"
+    #echo ""
     sleep $WAIT
 done
